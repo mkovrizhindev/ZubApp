@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { BackHandler, Platform, ScrollView, StatusBar as NativeStatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Dashboard from './src/Dashboard';
 import { Clinic, clinics, competitors, marketGrowth, rankedClinics, revenueHistory } from './src/clinics';
 
-type Page = { screen: 'clinics' | 'home' | 'analysis' | 'ranking' | 'company' | 'profile'; companyId?: string };
-const names: Record<Page['screen'], string> = { clinics: 'Мои клиники', home: 'Главная', analysis: 'Анализ конкурентов', ranking: 'Рейтинг', company: 'Компания', profile: 'Профиль' };
+type Page = { screen: 'dashboard' | 'clinics' | 'home' | 'analysis' | 'ranking' | 'company' | 'profile'; companyId?: string };
+const names: Record<Page['screen'], string> = { dashboard: 'Мой IDENT', clinics: 'Рынок', home: 'Рынок моей клиники', analysis: 'Анализ конкурентов', ranking: 'Рейтинг', company: 'Компания', profile: 'Профиль' };
 const money = (value: number | null) => value === null ? 'Нет данных' : `${value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} млн ₽`;
 function Growth({ value }: { value: number | null }) {
   return <Text style={[s.growth, value !== null && value < 0 && s.negative]}>{value === null ? '—' : `${value < 0 ? '↘' : '↗'} ${value > 0 ? '+' : ''}${value}%`}</Text>;
@@ -22,7 +23,7 @@ function ClinicCard({ clinic, onPress, active = false, rank }: { clinic: Clinic;
 }
 
 export default function App() {
-  const [history, setHistory] = useState<Page[]>([{ screen: 'clinics' }]);
+  const [history, setHistory] = useState<Page[]>([{ screen: 'dashboard' }]);
   const [selectedId, setSelectedId] = useState('north');
   const [radius, setRadius] = useState(3);
   const [sort, setSort] = useState<'distance' | 'revenue'>('distance');
@@ -33,7 +34,7 @@ export default function App() {
   const place = ranked.findIndex(c => c.id === clinic.id) + 1;
   const back = () => setHistory(h => h.length > 1 ? h.slice(0, -1) : h);
   const navigate = (screen: Page['screen'], companyId?: string) => setHistory(h => [...h, { screen, companyId }]);
-  const root = (screen: 'clinics' | 'profile') => setHistory([{ screen }]);
+  const root = (screen: 'dashboard' | 'clinics' | 'profile') => setHistory([{ screen }]);
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (history.length <= 1) return false;
@@ -54,6 +55,13 @@ export default function App() {
     </View>
     <ScrollView key={`${page.screen}-${page.companyId ?? ''}`} contentContainerStyle={s.content}>
       <Text style={s.demo}>ДЕМО · все компании и показатели вымышлены</Text>
+      {page.screen === 'dashboard' && <>
+        <Text style={s.section}>Моя клиника</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.wrap}>{clinics.filter(c => c.own).map(c => <TouchableOpacity key={c.id} accessibilityRole="radio" accessibilityState={{ selected: selectedId === c.id }} style={[s.chip, selectedId === c.id && s.activeChip]} onPress={() => setSelectedId(c.id)}><Text style={s.chipText}>{c.name}</Text></TouchableOpacity>)}</ScrollView>
+        <Text style={s.caption}>{clinic.address}</Text>
+        <Text style={s.caption}>Демонстрация рабочего стола: пример одинаков для подключённых клиник.</Text>
+        <Dashboard hasData={clinic.revenue !== null} />
+      </>}
       {page.screen === 'clinics' && <>
         <View style={s.card}><Text style={s.caption}>Всего клиник</Text><View style={s.between}><Text style={s.hero}>3</Text><Text style={s.amount}>{money(clinics.filter(c => c.own).reduce((sum, c) => sum + (c.revenue ?? 0), 0))}</Text></View><Text style={s.caption}>Выручка за 2025 · данные 2 из 3 клиник</Text></View>
         <Text style={s.section}>Выберите клинику для просмотра</Text>
@@ -99,17 +107,23 @@ export default function App() {
         <Button title="Вернуться к моим клиникам" onPress={() => root('clinics')} />
       </>}
     </ScrollView>
-    <View style={s.tabs}>{(['clinics', 'profile'] as const).map(tab => <TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{ selected: tab === 'profile' ? page.screen === 'profile' : page.screen !== 'profile' }} onPress={() => root(tab)} style={s.tab}><Text style={[s.tabIcon, (tab === 'profile' ? page.screen === 'profile' : page.screen !== 'profile') && s.activeTab]}>{tab === 'clinics' ? '⌂' : '◎'}</Text><Text style={s.caption}>{tab === 'clinics' ? 'Главная' : 'Профиль'}</Text></TouchableOpacity>)}</View>
+    <View style={s.tabs}>{(['dashboard', 'clinics', 'profile'] as const).map(tab => {
+      const active = tab === 'dashboard' ? page.screen === 'dashboard' : tab === 'profile' ? page.screen === 'profile' : !['dashboard', 'profile'].includes(page.screen);
+      return <TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={() => root(tab)} style={s.tab}>
+        {tab === 'dashboard' ? <View style={[s.identIcon, active && s.identIconActive]}><Text style={[s.check, active && s.activeTab]}>✓</Text></View> : tab === 'clinics' ? <View style={s.marketIcon}>{[10, 16, 23].map((height, i) => <View key={i} style={{ width: 4, height, borderRadius: 2, backgroundColor: active ? '#082D40' : '#91A2AF' }} />)}</View> : <View style={[s.profileIcon, active && s.identIconActive]}><View style={[s.profileDot, { backgroundColor: active ? '#082D40' : '#91A2AF' }]} /></View>}
+        <Text style={[s.tabLabel, active && s.activeTab]}>{tab === 'dashboard' ? 'Мой IDENT' : tab === 'clinics' ? 'Рынок' : 'Профиль'}</Text>
+      </TouchableOpacity>;
+    })}</View>
   </View>;
 }
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#EDF2F6', paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight : 54, paddingBottom: Platform.OS === 'ios' ? 28 : 12 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#E1E8EE' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', paddingVertical: 2, borderBottomWidth: 1, borderColor: '#E1E8EE' },
   headerButton: { padding: 12, minWidth: 48, alignItems: 'center' }, icon: { fontSize: 24, color: '#092C3E' }, headerTitle: { fontSize: 17, fontWeight: '700', color: '#092C3E' },
-  content: { padding: 16, gap: 12, paddingBottom: 30 }, demo: { fontSize: 10, color: '#637C8C', textAlign: 'center' },
-  card: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 14, gap: 10, borderWidth: 1, borderColor: '#E1E8EE' }, selected: { borderColor: '#AED01C', borderWidth: 2 },
-  caption: { fontSize: 12, color: '#687F8F', lineHeight: 18 }, cardTitle: { fontSize: 16, fontWeight: '700', color: '#092C3E' }, section: { fontSize: 18, fontWeight: '700', color: '#092C3E', marginTop: 4 },
+  content: { padding: 16, gap: 12, paddingBottom: 30 }, demo: { fontSize: 10, color: '#8196A4', textAlign: 'center' },
+  card: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 18, gap: 12, borderWidth: 1, borderColor: '#E1E8EE' }, selected: { borderColor: '#AED01C', borderWidth: 2 },
+  caption: { fontSize: 12, color: '#687F8F', lineHeight: 18 }, cardTitle: { fontSize: 16, fontWeight: '700', color: '#092C3E' }, section: { fontSize: 17, fontWeight: '700', color: '#092C3E', marginTop: 8 },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, amount: { color: '#092C3E', fontSize: 18, fontWeight: '700' }, hero: { color: '#092C3E', fontSize: 32, fontWeight: '700' },
   growth: { color: '#09B78B', fontSize: 17, fontWeight: '600' }, negative: { color: '#EF5664' },
   banner: { padding: 20, backgroundColor: '#243747', borderRadius: 16, gap: 14 }, bannerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' }, bannerText: { color: '#C3D0DB', lineHeight: 22 },
@@ -117,5 +131,6 @@ const s = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, chip: { padding: 12, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCE4EB' }, activeChip: { backgroundColor: '#E9F4BD', borderColor: '#AED01C' }, chipText: { color: '#173244', fontSize: 13 },
   detail: { borderTopWidth: 1, borderColor: '#EDF2F6', paddingTop: 10, gap: 4 }, body: { color: '#173244', fontSize: 14, lineHeight: 22 },
   chart: { height: 170, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingBottom: 10 }, barColumn: { alignItems: 'center', gap: 6 }, bar: { width: 44, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: '#AED01C' }, chartValue: { color: '#173244', fontSize: 12 },
+  tabLabel: { fontSize: 11, color: '#91A2AF', fontWeight: '600' }, identIcon: { width: 24, height: 24, borderWidth: 2, borderColor: '#91A2AF', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }, identIconActive: { borderColor: '#082D40' }, check: { fontSize: 18, fontWeight: '800', color: '#91A2AF', lineHeight: 21 }, marketIcon: { height: 24, flexDirection: 'row', alignItems: 'flex-end', gap: 3 }, profileIcon: { height: 24, width: 24, borderRadius: 12, borderWidth: 2, borderColor: '#91A2AF', alignItems: 'center', justifyContent: 'center' }, profileDot: { width: 8, height: 8, borderRadius: 4 },
   tabs: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderTopWidth: 1, borderColor: '#E1E8EE', paddingTop: 8 }, tab: { flex: 1, alignItems: 'center', padding: 6, gap: 2 }, tabIcon: { fontSize: 24, color: '#91A2AF' }, activeTab: { color: '#092C3E' },
 });
